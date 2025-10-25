@@ -1,169 +1,159 @@
-import React, { useRef } from 'react';
-import { Wand2, Image as ImageIcon, Brush, Paintbrush, Bone, Film, Loader2 } from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Image as ImageIcon, Wand2, Brush, Layers, Bone, Film, Settings } from 'lucide-react';
+import useEditorStore from '../store/useEditorStore.js';
 
-export default function LeftSidebarTools({ selectedTool, setSelectedTool, aiParams, setAiParams, onGenerateTextTo3D, generationProgress, onCancelGeneration, accent = '#26A69A' }) {
-  const fileRef = useRef();
+const Section = ({ title, children, right }) => (
+  <div className="border-b border-white/10">
+    <div className="flex items-center justify-between px-4 py-2 text-xs uppercase tracking-wider text-gray-400">
+      <span>{title}</span>
+      {right}
+    </div>
+    <div className="p-4 pt-0">{children}</div>
+  </div>
+);
+
+export default function LeftSidebarTools() {
+  const {
+    aiParams,
+    setAITextPrompt,
+    setAIStyle,
+    setAIComplexity,
+    setAIDetail,
+    generating,
+    generationProgress,
+    startAIGeneration,
+    cancelAIGeneration,
+    setSelectedTool,
+    selectedTool,
+    setImageReconstruction,
+    imageParams,
+  } = useEditorStore();
+
+  const onDrop = useCallback((acceptedFiles) => {
+    if (!acceptedFiles?.length) return;
+    // In a real app, upload and process
+    setSelectedTool('image-to-3d');
+  }, [setSelectedTool]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    multiple: false,
+    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.tif', '.tiff'] },
+  });
 
   return (
-    <aside className="h-full overflow-y-auto" style={{ borderRight: '1px solid #1f1f1f' }}>
-      <div className="p-3">
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <ToolButton icon={<Wand2 size={18} />} label="Text" active={selectedTool === 'text-to-3d'} onClick={() => setSelectedTool('text-to-3d')} accent={accent} />
-          <ToolButton icon={<ImageIcon size={18} />} label="Image" active={selectedTool === 'image-to-3d'} onClick={() => setSelectedTool('image-to-3d')} accent={accent} />
-          <ToolButton icon={<Brush size={18} />} label="Sculpt" active={selectedTool === 'sculpt'} onClick={() => setSelectedTool('sculpt')} accent={accent} />
-          <ToolButton icon={<Paintbrush size={18} />} label="Paint" active={selectedTool === 'paint'} onClick={() => setSelectedTool('paint')} accent={accent} />
-          <ToolButton icon={<Bone size={18} />} label="Rig" active={selectedTool === 'rig'} onClick={() => setSelectedTool('rig')} accent={accent} />
-          <ToolButton icon={<Film size={18} />} label="Animate" active={selectedTool === 'animate'} onClick={() => setSelectedTool('animate')} accent={accent} />
-        </div>
-
-        {selectedTool === 'text-to-3d' && (
-          <section className="space-y-3">
-            <h3 className="font-medium">Text to 3D</h3>
-            <label className="flex flex-col gap-1 text-sm">
-              <span>Prompt</span>
-              <textarea className="bg-[#111] border border-[#2a2a2a] rounded p-2" rows={4} value={aiParams.textPrompt} onChange={(e) => setAiParams({ ...aiParams, textPrompt: e.target.value })} placeholder="e.g., A photorealistic ceramic mug with a wooden handle" />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span>Style</span>
-              <select className="bg-[#111] border border-[#2a2a2a] rounded px-2 py-1" value={aiParams.style} onChange={(e) => setAiParams({ ...aiParams, style: e.target.value })}>
-                <option value="photorealistic">Photorealistic</option>
-                <option value="stylized">Stylized</option>
-                <option value="abstract">Abstract</option>
-                <option value="low-poly">Low Poly</option>
-                <option value="hand-painted">Hand-Painted</option>
+    <div className="text-sm">
+      <Section title="Text to 3D" right={<Wand2 size={14} className="text-[#26A69A]" />}>
+        <div className="space-y-2">
+          <textarea
+            className="w-full h-24 bg-white/5 border border-white/10 rounded p-2 outline-none focus:border-[#26A69A]"
+            placeholder="Describe your model: 'A stylized low-poly tree with mossy bark'"
+            value={aiParams.prompt}
+            onChange={(e) => setAITextPrompt(e.target.value)}
+          />
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Style</label>
+              <select
+                className="bg-white/5 border border-white/10 rounded px-2 py-1.5"
+                value={aiParams.style}
+                onChange={(e) => setAIStyle(e.target.value)}
+              >
+                <option>photorealistic</option>
+                <option>stylized</option>
+                <option>abstract</option>
+                <option>low-poly</option>
+                <option>hand-painted</option>
               </select>
-            </label>
-            <Range label="Complexity" value={aiParams.complexity} onChange={(v) => setAiParams({ ...aiParams, complexity: v })} />
-            <Range label="Detail Level" value={aiParams.detail} onChange={(v) => setAiParams({ ...aiParams, detail: v })} />
-
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Complexity</label>
+              <input
+                type="range" min={0} max={100}
+                value={aiParams.complexity}
+                onChange={(e) => setAIComplexity(Number(e.target.value))}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Detail</label>
+              <input
+                type="range" min={0} max={100}
+                value={aiParams.detail}
+                onChange={(e) => setAIDetail(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          {!generating ? (
+            <button
+              onClick={startAIGeneration}
+              className="w-full py-2 rounded bg-[#26A69A] text-black font-semibold hover:opacity-90"
+            >Generate</button>
+          ) : (
             <div className="flex items-center gap-2">
-              {!generationProgress.active ? (
-                <button onClick={onGenerateTextTo3D} className="px-3 py-1 rounded text-black" style={{ backgroundColor: accent }}>Generate</button>
-              ) : (
-                <button onClick={onCancelGeneration} className="px-3 py-1 rounded border border-[#2a2a2a]">Cancel</button>
-              )}
-              {generationProgress.active && (
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>{generationProgress.phase} {Math.floor(generationProgress.percent)}%</span>
-                </div>
-              )}
+              <div className="flex-1 h-2 bg-white/10 rounded overflow-hidden">
+                <div className="h-full bg-[#26A69A]" style={{ width: `${generationProgress}%` }} />
+              </div>
+              <button onClick={cancelAIGeneration} className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs">Cancel</button>
             </div>
+          )}
+        </div>
+      </Section>
 
-            <div className="rounded p-2 mt-2" style={{ backgroundColor: '#161616', border: '1px solid #262626' }}>
-              <div className="text-xs text-gray-400 mb-2">Real-time Mesh Preview</div>
-              <div className="h-28 rounded bg-[#0f0f0f] border border-[#1f1f1f] flex items-center justify-center text-gray-500 text-xs">Preview viewport</div>
-            </div>
-          </section>
-        )}
+      <Section title="Image to 3D" right={<ImageIcon size={14} className="text-[#26A69A]" />}>
+        <div {...getRootProps()} className={`border-2 border-dashed rounded p-4 text-center cursor-pointer transition ${isDragActive ? 'border-[#26A69A] bg-[#26A69A]/10' : 'border-white/15 bg-white/5 hover:bg-white/10'}`}>
+          <input {...getInputProps()} />
+          <p className="text-gray-300">Drop JPG, PNG, or TIFF here, or click to upload.</p>
+          <p className="text-[11px] text-gray-500 mt-1">Up to 50 MB</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Depth</label>
+            <input type="range" min={0} max={100} value={imageParams.depth} onChange={(e)=>setImageReconstruction({ depth: Number(e.target.value)})} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Mesh Density</label>
+            <input type="range" min={0} max={100} value={imageParams.density} onChange={(e)=>setImageReconstruction({ density: Number(e.target.value)})} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Texture Detail</label>
+            <input type="range" min={0} max={100} value={imageParams.textureDetail} onChange={(e)=>setImageReconstruction({ textureDetail: Number(e.target.value)})} />
+          </div>
+        </div>
+      </Section>
 
-        {selectedTool === 'image-to-3d' && (
-          <section className="space-y-3">
-            <h3 className="font-medium">Image to 3D</h3>
-            <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.tif,.tiff" className="block w-full text-sm" />
-            <Range label="Depth Estimation" value={aiParams.depthEstimation} onChange={(v) => setAiParams({ ...aiParams, depthEstimation: v })} />
-            <Range label="Mesh Density" value={aiParams.meshDensity} onChange={(v) => setAiParams({ ...aiParams, meshDensity: v })} />
-            <Range label="Texture Detail" value={aiParams.textureDetail} onChange={(v) => setAiParams({ ...aiParams, textureDetail: v })} />
-            <button className="px-3 py-1 rounded text-black" style={{ backgroundColor: accent }}>Reconstruct</button>
-          </section>
-        )}
-
-        {selectedTool === 'sculpt' && (
-          <section className="space-y-3">
-            <h3 className="font-medium">Sculpting</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <button className="px-2 py-1 rounded bg-[#1a1a1a] border border-[#2a2a2a]">Brush</button>
-              <button className="px-2 py-1 rounded bg-[#1a1a1a] border border-[#2a2a2a]">Smooth</button>
-              <button className="px-2 py-1 rounded bg-[#1a1a1a] border border-[#2a2a2a]">Inflate</button>
-              <button className="px-2 py-1 rounded bg-[#1a1a1a] border border-[#2a2a2a]">Flatten</button>
-            </div>
-            <Range label="Brush Size" value={0.5} onChange={() => {}} />
-            <Range label="Strength" value={0.6} onChange={() => {}} />
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Subdivision</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Simplify</button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Retopology</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Boolean Ops</button>
-            </div>
-          </section>
-        )}
-
-        {selectedTool === 'paint' && (
-          <section className="space-y-3">
-            <h3 className="font-medium">Texture Painting</h3>
-            <Range label="Brush Size" value={0.4} onChange={() => {}} />
-            <Range label="Opacity" value={0.8} onChange={() => {}} />
-            <div className="text-sm">Layers</div>
-            <div className="space-y-1 text-xs">
-              <LayerItem name="Albedo" active />
-              <LayerItem name="Roughness" />
-              <LayerItem name="Normal" />
-              <LayerItem name="Metalness" />
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">New Layer</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Mask</button>
-            </div>
-          </section>
-        )}
-
-        {selectedTool === 'rig' && (
-          <section className="space-y-3">
-            <h3 className="font-medium">Rigging</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Add Bone</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Skin</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Weights</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">IK</button>
-            </div>
-            <div className="text-xs text-gray-400">Import MoCap (BVH, FBX)</div>
-            <button className="px-2 py-1 rounded border border-[#2a2a2a] text-sm">Import</button>
-          </section>
-        )}
-
+      <Section title="Editing Tools" right={<Settings size={14} className="text-[#26A69A]" />}>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { key: 'sculpt', label: 'Sculpt', icon: Brush },
+            { key: 'texture', label: 'Texture', icon: Layers },
+            { key: 'rig', label: 'Rig', icon: Bone },
+            { key: 'animate', label: 'Animate', icon: Film },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setSelectedTool(key)}
+              className={`flex items-center gap-2 px-3 py-2 rounded border text-sm ${selectedTool===key ? 'bg-[#26A69A] text-black border-transparent' : 'bg-white/5 hover:bg-white/10 border-white/10'}`}
+            >
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </div>
         {selectedTool === 'animate' && (
-          <section className="space-y-3">
-            <h3 className="font-medium">Animation</h3>
-            <div className="text-xs text-gray-400">Timeline & Keyframes</div>
-            <div className="h-20 rounded bg-[#0f0f0f] border border-[#1f1f1f]" />
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Keyframe</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Play</button>
-              <button className="px-2 py-1 rounded border border-[#2a2a2a]">Stop</button>
+          <div className="mt-3">
+            <div className="flex items-center gap-2">
+              <button className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs flex items-center gap-2">
+                <Play size={14}/> Play
+              </button>
+              <button className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs">Add Keyframe</button>
+              <button className="px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-xs">IK Solve</button>
             </div>
-          </section>
+            <div className="mt-2 h-16 rounded bg-white/5 border border-white/10 text-[11px] text-gray-400 flex items-center justify-center">
+              Timeline / Keyframes
+            </div>
+          </div>
         )}
-      </div>
-    </aside>
-  );
-}
-
-function ToolButton({ icon, label, active, onClick, accent }) {
-  return (
-    <button onClick={onClick} className="flex items-center justify-center gap-1 px-2 py-2 rounded text-xs" style={{ backgroundColor: active ? '#1b1f1f' : '#151515', border: `1px solid ${active ? accent : '#2a2a2a'}`, color: active ? accent : '#e5e7eb' }}>
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function Range({ label, value, onChange }) {
-  return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-gray-300">{label}</span>
-      <input type="range" min="0" max="1" step="0.01" value={value} onChange={(e) => onChange(parseFloat(e.target.value))} />
-      <span className="text-xs text-gray-500">{Math.round(value * 100)}%</span>
-    </label>
-  );
-}
-
-function LayerItem({ name, active }) {
-  return (
-    <div className="flex items-center justify-between px-2 py-1 rounded border" style={{ background: active ? '#1a1a1a' : 'transparent', borderColor: '#2a2a2a' }}>
-      <span>{name}</span>
-      <span className="text-gray-500 text-[10px]">Visible</span>
+      </Section>
     </div>
   );
 }
